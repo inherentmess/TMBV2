@@ -31,8 +31,8 @@ ALL_EVENTS = [
     Events.DROP_CLAIM,
     Events.BET_WIN,
     Events.BET_LOSE,
-    Events.BET_STARTED,
-    Events.BET_SUBMITTED,
+    Events.BET_START,
+    Events.BET_SUBMIT,
     Events.CHAT_MENTION,
     Events.STREAMER_TITLE,
     Events.STREAMER_CATEGORY,
@@ -45,6 +45,7 @@ ALL_EVENTS = [
     Events.STREAMER_VIEWERS,
     Events.ERROR,
 ]
+
 
 # --- Twitch Miner Setup ---
 twitch_miner = TwitchChannelPointsMiner(
