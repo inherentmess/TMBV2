@@ -29,23 +29,14 @@ ALL_EVENTS = [
     Events.STREAMER_ONLINE,
     Events.STREAMER_OFFLINE,
     Events.DROP_CLAIM,
-    Events.BET_WIN,
-    Events.BET_LOSE,
-    Events.BET_START,
-    Events.BET_SUBMIT,
-    Events.CHAT_MENTION,
-    Events.STREAMER_TITLE,
-    Events.STREAMER_CATEGORY,
-    Events.DROP_PROGRESS,
-    Events.DROP_UPDATED,
-    Events.GOAL_CONTRIBUTION,
-    Events.POLL_STARTED,
-    Events.POLL_FINISHED,
-    Events.MOMENT_CLAIM,
-    Events.STREAMER_VIEWERS,
-    Events.ERROR,
+    Events.JOIN_RAID,
+    Events.DROP_STATUS,
+    Events.GAIN_FOR_RAID,
+    Events.GAIN_FOR_CLAIM,
+    Events.GAIN_FOR_WATCH,
+    Events.BET_GENERAL,
+    Events.BONUS_CLAIM,
 ]
-
 
 # --- Twitch Miner Setup ---
 twitch_miner = TwitchChannelPointsMiner(
