@@ -29,7 +29,6 @@ ALL_EVENTS = [
     Events.STREAMER_ONLINE,
     Events.STREAMER_OFFLINE,
     Events.DROP_CLAIM,
-    Events.DROP_READY,
     Events.BET_WIN,
     Events.BET_LOSE,
     Events.BET_STARTED,
