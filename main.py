@@ -22,11 +22,6 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # --- Main Miner Setup with Cookie Login ---
 twitch_miner = TwitchChannelPointsMiner(
-    use_cookies=True,
-    cookies={
-        "auth-token": TWITCH_AUTH_TOKEN,
-        "device-id": TWITCH_DEVICE_ID,
-    },
     claim_drops_startup=False,
     priority=[Priority.STREAK, Priority.DROPS, Priority.ORDER],
     enable_analytics=False,
