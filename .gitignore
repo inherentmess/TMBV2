@@ -1,7 +1,50 @@
-# Python cache files
+# -------------------
+# Python
+# -------------------
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 *.pyc
+*.egg-info/
+.Python
+env/
+venv/
+ENV/
+.build/
 
-# Ignore credentials
+# -------------------
+# Environment & Secrets
+# -------------------
 .env
+.env.*
 cookies/cookies.txt
+
+# -------------------
+# Logs & Outputs
+# -------------------
+*.log
+logs/
+*.sqlite
+analytics/
+*.db
+
+# -------------------
+# OS / Editor files
+# -------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# -------------------
+# Docker
+# -------------------
+*.tar
+*.img
+.dockerignore
+
+# -------------------
+# Railway (optional if using CLI)
+# -------------------
+railway.json
