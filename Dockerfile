@@ -1,43 +1,17 @@
-FROM python:3.12
-
-ARG BUILDX_QEMU_ENV
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /usr/src/app
 
-COPY ./requirements.txt ./
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
+COPY . .
 
-RUN pip install --upgrade pip
+# Uncomment if using cookies login persistence
+# VOLUME ["/usr/src/app/cookies"]
 
-RUN apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --fix-missing --no-install-recommends \
-    gcc \
-    libffi-dev \
-    rustc \
-    zlib1g-dev \
-    libjpeg-dev \
-    libssl-dev \
-    libblas-dev \
-    liblapack-dev \
-    make \
-    cmake \    
-    automake \
-    ninja-build \
-    g++ \
-    subversion \
-    python3-dev \
-  && if [ "${BUILDX_QEMU_ENV}" = "true" ] && [ "$(getconf LONG_BIT)" = "32" ]; then \
-        pip install -U cryptography==3.3.2; \
-     fi \
-  && pip install -r requirements.txt \
-  && pip cache purge \
-  && apt-get remove -y gcc rustc \
-  && apt-get autoremove -y \
-  && apt-get autoclean -y \
-  && apt-get clean -y \
-  && rm -rf /var/lib/apt/lists/* \
-  && rm -rf /usr/share/doc/*
+# Uncomment if using the analytics server
+# EXPOSE 5000
 
-ADD ./TwitchChannelPointsMiner ./TwitchChannelPointsMiner
-ENTRYPOINT [ "python", "run.py" ]
+CMD ["python", "main.py"]
