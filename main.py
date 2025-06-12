@@ -8,25 +8,25 @@ from TwitchChannelPointsMiner.classes.Chat import ChatPresence
 from TwitchChannelPointsMiner.classes.Discord import Discord
 from TwitchChannelPointsMiner.classes.Webhook import Webhook
 from TwitchChannelPointsMiner.classes.Telegram import Telegram
-from TwitchChannelPointsMiner.classes.Matrix import Matrix
-from TwitchChannelPointsMiner.classes.Pushover import Pushover
-from TwitchChannelPointsMiner.classes.Gotify import Gotify
 from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
 from TwitchChannelPointsMiner.classes.entities.Bet import Strategy, BetSettings, Condition, OutcomeKeys, FilterCondition, DelayMode
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
 
 # --- Environment Variables ---
-TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
-TWITCH_PASSWORD = os.getenv("TWITCH_PASSWORD")
+TWITCH_AUTH_TOKEN = os.getenv("TWITCH_AUTH_TOKEN")
+TWITCH_DEVICE_ID = os.getenv("TWITCH_DEVICE_ID")
+CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-CHANNELS = os.getenv("CHANNELS", "").split(",")  # streamer1,streamer2,...
 
-# --- Main Miner Configuration ---
+# --- Main Miner Setup with Cookie Login ---
 twitch_miner = TwitchChannelPointsMiner(
-    username=TWITCH_USERNAME,
-    password=TWITCH_PASSWORD,
+    use_cookies=True,
+    cookies={
+        "auth-token": TWITCH_AUTH_TOKEN,
+        "device-id": TWITCH_DEVICE_ID,
+    },
     claim_drops_startup=False,
     priority=[Priority.STREAK, Priority.DROPS, Priority.ORDER],
     enable_analytics=False,
@@ -37,7 +37,6 @@ twitch_miner = TwitchChannelPointsMiner(
         console_level=logging.INFO,
         console_username=False,
         auto_clear=True,
-        time_zone="",
         file_level=logging.DEBUG,
         emoji=True,
         less=False,
@@ -57,10 +56,6 @@ twitch_miner = TwitchChannelPointsMiner(
             webhook_api=DISCORD_WEBHOOK_URL,
             events=[Events.STREAMER_ONLINE, Events.STREAMER_OFFLINE, Events.BET_LOSE, Events.CHAT_MENTION]
         ) if DISCORD_WEBHOOK_URL else None,
-        webhook=None,
-        matrix=None,
-        pushover=None,
-        gotify=None
     ),
     streamer_settings=StreamerSettings(
         make_predictions=True,
@@ -92,6 +87,6 @@ twitch_miner = TwitchChannelPointsMiner(
 streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
 twitch_miner.mine(
     streamers,
-    followers=False,
+    followers=True,
     followers_order=FollowersOrder.ASC
 )
