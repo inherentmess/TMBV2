@@ -32,9 +32,6 @@ ALL_EVENTS = [
     Events.BET_WIN,
     Events.BET_LOSE,
     Events.CHAT_MENTION,
-    Events.DROP_PROGRESS,
-    Events.DROP_UPDATED,
-    Events.GOAL_CONTRIBUTION,
     Events.MOMENT_CLAIM,
 ]
 
