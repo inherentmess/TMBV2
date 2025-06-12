@@ -31,16 +31,11 @@ ALL_EVENTS = [
     Events.DROP_CLAIM,
     Events.BET_WIN,
     Events.BET_LOSE,
-    Events.BET_STARTED,
-    Events.BET_SUBMITTED,
     Events.CHAT_MENTION,
     Events.DROP_PROGRESS,
     Events.DROP_UPDATED,
     Events.GOAL_CONTRIBUTION,
-    Events.POLL_STARTED,
-    Events.POLL_FINISHED,
     Events.MOMENT_CLAIM,
-    Events.STREAMER_VIEWERS,
 ]
 
 # --- Twitch Miner Setup ---
