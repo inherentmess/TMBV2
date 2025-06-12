@@ -2,6 +2,7 @@
 import os
 import logging
 from colorama import Fore
+
 from TwitchChannelPointsMiner import TwitchChannelPointsMiner
 from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
 from TwitchChannelPointsMiner.classes.Chat import ChatPresence
@@ -9,23 +10,46 @@ from TwitchChannelPointsMiner.classes.Discord import Discord
 from TwitchChannelPointsMiner.classes.Webhook import Webhook
 from TwitchChannelPointsMiner.classes.Telegram import Telegram
 from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
-from TwitchChannelPointsMiner.classes.entities.Bet import Strategy, BetSettings, Condition, OutcomeKeys, FilterCondition, DelayMode
+from TwitchChannelPointsMiner.classes.entities.Bet import (
+    Strategy, BetSettings, Condition, OutcomeKeys,
+    FilterCondition, DelayMode
+)
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
 
 # --- Environment Variables ---
-TWITCH_AUTH_TOKEN = os.getenv("TWITCH_AUTH_TOKEN")
-TWITCH_DEVICE_ID = os.getenv("TWITCH_DEVICE_ID")
+TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
 CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# Load your Twitch username (only this is required — not password)
-TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
+# --- All Supported Events ---
+ALL_EVENTS = [
+    Events.STREAMER_ONLINE,
+    Events.STREAMER_OFFLINE,
+    Events.DROP_CLAIM,
+    Events.DROP_READY,
+    Events.BET_WIN,
+    Events.BET_LOSE,
+    Events.BET_STARTED,
+    Events.BET_SUBMITTED,
+    Events.CHAT_MENTION,
+    Events.STREAMER_TITLE,
+    Events.STREAMER_CATEGORY,
+    Events.DROP_PROGRESS,
+    Events.DROP_UPDATED,
+    Events.GOAL_CONTRIBUTION,
+    Events.POLL_STARTED,
+    Events.POLL_FINISHED,
+    Events.MOMENT_CLAIM,
+    Events.STREAMER_VIEWERS,
+    Events.ERROR,
+]
 
+# --- Twitch Miner Setup ---
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
-    # password is omitted — cookies.txt will be used instead
     claim_drops_startup=False,
     priority=[Priority.STREAK, Priority.DROPS, Priority.ORDER],
     enable_analytics=False,
@@ -38,7 +62,26 @@ twitch_miner = TwitchChannelPointsMiner(
         emoji=True,
         less=False,
         colored=True,
-        # (Discord, Telegram, etc. same as before...)
+        color_palette=ColorPalette(
+            STREAMER_online="GREEN",
+            streamer_offline="RED",
+            BET_wiN=Fore.MAGENTA
+        ),
+        telegram=Telegram(
+            chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
+            token=TELEGRAM_TOKEN,
+            events=ALL_EVENTS,
+            disable_notification=True
+        ) if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID else None,
+        discord=Discord(
+            webhook_api=DISCORD_WEBHOOK_URL,
+            events=ALL_EVENTS
+        ) if DISCORD_WEBHOOK_URL else None,
+        webhook=Webhook(
+            endpoint=WEBHOOK_URL,
+            method="POST",
+            events=ALL_EVENTS
+        ) if WEBHOOK_URL else None
     ),
     streamer_settings=StreamerSettings(
         make_predictions=True,
@@ -66,8 +109,9 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Streamers to mine ---
+# --- Streamers List ---
 streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
+
 twitch_miner.mine(
     streamers,
     followers=True,
