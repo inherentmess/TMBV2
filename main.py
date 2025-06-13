@@ -28,6 +28,16 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 ALL_EVENTS = [
     Events.STREAMER_ONLINE,
     Events.STREAMER_OFFLINE,
+    Events.GAIN_FOR_RAID,
+    Events.GAIN_FOR_CLAIM,
+    Events.BET_REFUND,
+    Events.BET_FILTERS,
+    Events.BET_GENERAL,
+    Events.BET_FAILED,
+    Events.BET_START,
+    Events.BONUS_CLAIM,
+    Events.JOIN_RAID,
+    Events.DROP_STATUS,
     Events.DROP_CLAIM,
     Events.BET_WIN,
     Events.BET_LOSE,
@@ -102,6 +112,6 @@ streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
 
 twitch_miner.mine(
     streamers,
-    followers=False,
+    followers=True,
     followers_order=FollowersOrder.ASC
 )
