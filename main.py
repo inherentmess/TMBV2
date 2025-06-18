@@ -30,7 +30,7 @@ ALL_EVENTS = [
     Events.STREAMER_OFFLINE,
     Events.GAIN_FOR_RAID,
     Events.GAIN_FOR_CLAIM,
-    Events.GAIN_FOR_WATCH
+    Events.GAIN_FOR_WATCH,
     Events.BET_REFUND,
     Events.BET_FILTERS,
     Events.BET_GENERAL,
