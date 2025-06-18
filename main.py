@@ -30,6 +30,7 @@ ALL_EVENTS = [
     Events.STREAMER_OFFLINE,
     Events.GAIN_FOR_RAID,
     Events.GAIN_FOR_CLAIM,
+    Events.GAIN_FOR_WATCH
     Events.BET_REFUND,
     Events.BET_FILTERS,
     Events.BET_GENERAL,
@@ -49,7 +50,7 @@ ALL_EVENTS = [
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
     claim_drops_startup=False,
-    priority=[Priority.STREAK, Priority.DROPS, Priority.ORDER],
+    priority=[Priority.STREAK, Priority.DROPS, Priority.POINTS_ASCENDING],
     enable_analytics=False,
     disable_ssl_cert_verification=False,
     disable_at_in_nickname=False,
@@ -87,7 +88,7 @@ twitch_miner = TwitchChannelPointsMiner(
         claim_drops=True,
         claim_moments=True,
         watch_streak=True,
-        community_goals=False,
+        community_goals=True,
         chat=ChatPresence.ONLINE,
         bet=BetSettings(
             strategy=Strategy.SMART,
