@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
+import threading
+from flask import Flask
 from colorama import Fore
 
 from TwitchChannelPointsMiner import TwitchChannelPointsMiner
@@ -15,6 +17,16 @@ from TwitchChannelPointsMiner.classes.entities.Bet import (
     FilterCondition, DelayMode
 )
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
+
+# --- Background Web Server (for Railway keep-alive) ---
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Twitch Miner is running"
+
+def run_web():
+    app.run(host="0.0.0.0", port=3000)
 
 # --- Environment Variables ---
 TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
@@ -108,11 +120,13 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Streamers List ---
-streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
+# --- Start Web Server + Miner ---
+if __name__ == "__main__":
+    threading.Thread(target=run_web).start()
 
-twitch_miner.mine(
-    streamers,
-    followers=True,
-    followers_order=FollowersOrder.ASC
-)
+    streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
+    twitch_miner.mine(
+        streamers,
+        followers=True,
+        followers_order=FollowersOrder.ASC
+    )
