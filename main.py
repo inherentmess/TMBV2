@@ -95,7 +95,7 @@ twitch_miner = TwitchChannelPointsMiner(
         ) if WEBHOOK_URL else None
     ),
     streamer_settings=StreamerSettings(
-        make_predictions=True,
+        make_predictions=False,
         follow_raid=True,
         claim_drops=True,
         claim_moments=True,
