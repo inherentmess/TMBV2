@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
 import threading
+import logging
 from flask import Flask
+from colorama import Fore
+
 from TwitchChannelPointsMiner import TwitchChannelPointsMiner
 from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
 from TwitchChannelPointsMiner.classes.Chat import ChatPresence
@@ -9,10 +12,13 @@ from TwitchChannelPointsMiner.classes.Discord import Discord
 from TwitchChannelPointsMiner.classes.Webhook import Webhook
 from TwitchChannelPointsMiner.classes.Telegram import Telegram
 from TwitchChannelPointsMiner.classes.Settings import Priority, Events, FollowersOrder
-from TwitchChannelPointsMiner.classes.entities.Bet import Strategy, BetSettings, FilterCondition, Condition, OutcomeKeys, DelayMode
+from TwitchChannelPointsMiner.classes.entities.Bet import (
+    Strategy, BetSettings, Condition, OutcomeKeys,
+    FilterCondition, DelayMode
+)
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
 
-# --- Flask Web Server for Railway ---
+# --- Background Web Server (for Railway keep-alive) ---
 app = Flask(__name__)
 
 @app.route("/")
@@ -24,7 +30,7 @@ def run_web():
 
 # --- Environment Variables ---
 TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
-CHANNELS = os.getenv("CHANNELS", "").split(",")  # Manual channels
+CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -52,37 +58,7 @@ ALL_EVENTS = [
     Events.MOMENT_CLAIM,
 ]
 
-# --- Logger & Notifications Setup ---
-logger_settings = LoggerSettings(
-    save=True,
-    console_level="INFO",
-    file_level="DEBUG",
-    emoji=True,
-    less=False,
-    colored=True,
-    color_palette=ColorPalette(
-        STREAMER_online="GREEN",
-        streamer_offline="RED",
-        BET_wiN="MAGENTA"
-    ),
-    telegram=Telegram(
-        chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
-        token=TELEGRAM_TOKEN,
-        events=ALL_EVENTS,
-        disable_notification=True
-    ) if TELEGRAM_TOKEN else None,
-    discord=Discord(
-        webhook_api=DISCORD_WEBHOOK_URL,
-        events=ALL_EVENTS
-    ) if DISCORD_WEBHOOK_URL else None,
-    webhook=Webhook(
-        endpoint=WEBHOOK_URL,
-        method="POST",
-        events=ALL_EVENTS
-    ) if WEBHOOK_URL else None
-)
-
-# --- Initialize Twitch Miner ---
+# --- Twitch Miner Setup ---
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
     claim_drops_startup=False,
@@ -90,7 +66,35 @@ twitch_miner = TwitchChannelPointsMiner(
     enable_analytics=False,
     disable_ssl_cert_verification=False,
     disable_at_in_nickname=False,
-    logger_settings=logger_settings,
+    max_threads=10,  # increase parallelization (max concurrent channels)
+    logger_settings=LoggerSettings(
+        save=True,
+        console_level=logging.INFO,
+        file_level=logging.DEBUG,
+        emoji=True,
+        less=False,
+        colored=True,
+        color_palette=ColorPalette(
+            STREAMER_online="GREEN",
+            streamer_offline="RED",
+            BET_wiN=Fore.MAGENTA
+        ),
+        telegram=Telegram(
+            chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
+            token=TELEGRAM_TOKEN,
+            events=ALL_EVENTS,
+            disable_notification=True
+        ) if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID else None,
+        discord=Discord(
+            webhook_api=DISCORD_WEBHOOK_URL,
+            events=ALL_EVENTS
+        ) if DISCORD_WEBHOOK_URL else None,
+        webhook=Webhook(
+            endpoint=WEBHOOK_URL,
+            method="POST",
+            events=ALL_EVENTS
+        ) if WEBHOOK_URL else None
+    ),
     streamer_settings=StreamerSettings(
         make_predictions=False,
         follow_raid=True,
@@ -119,13 +123,15 @@ twitch_miner = TwitchChannelPointsMiner(
 
 # --- Start Web Server + Miner ---
 if __name__ == "__main__":
+    # Start Railway web server
     threading.Thread(target=run_web).start()
 
-    # Combine manual channels + followers
+    # Combine manually added channels with followed channels
     streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
 
+    # Start mining with follower discovery
     twitch_miner.mine(
         streamers,
-        followers=True,  # Automatically fetch followers of your account
-        followers_order=FollowersOrder.ASC  # Change to DESC if desired
+        followers=True,                # mine channels you follow
+        followers_order=FollowersOrder.ASC
     )
