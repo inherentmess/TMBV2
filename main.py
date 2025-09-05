@@ -130,12 +130,21 @@ def mine_subset(subset):
     streamers = [Streamer(name.strip()) for name in subset if name.strip()]
     twitch_miner.mine(streamers, followers=True, followers_order=FollowersOrder.ASC)
 
-# --- Auto-refresh followers ---
+# --- Auto-refresh followers (safe) ---
 def refresh_followers():
     while True:
         time.sleep(REFRESH_INTERVAL * 60)
         logging.info(f"[AUTO-REFRESH] Reloading followers (every {REFRESH_INTERVAL} min)...")
-        mine_subset(CHANNELS)
+        if twitch_miner.running:
+            followers_array = twitch_miner.twitch.get_followers(order=FollowersOrder.ASC)
+            new_streamers = [
+                Streamer(username.strip())
+                for username in followers_array
+                if username.strip() not in [s.username for s in twitch_miner.streamers]
+            ]
+            if new_streamers:
+                logging.info(f"Adding {len(new_streamers)} new followers to existing session...")
+                twitch_miner.streamers.extend(new_streamers)
 
 # --- Main ---
 if __name__ == "__main__":
