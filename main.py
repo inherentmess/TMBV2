@@ -2,7 +2,6 @@
 import os
 import logging
 import threading
-import requests
 from flask import Flask
 from colorama import Fore
 
@@ -30,34 +29,14 @@ def run_web():
     app.run(host="0.0.0.0", port=3000)
 
 # --- Environment Variables ---
-TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
-TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
+TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
 TWITCH_OAUTH_TOKEN = os.getenv("TWITCH_OAUTH_TOKEN")
 TWITCH_REFRESH_TOKEN = os.getenv("TWITCH_REFRESH_TOKEN")
-TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
 CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-# --- Refresh Twitch Token Function ---
-def refresh_twitch_token():
-    global TWITCH_OAUTH_TOKEN
-    global TWITCH_REFRESH_TOKEN
-
-    url = "https://id.twitch.tv/oauth2/token"
-    params = {
-        "grant_type": "refresh_token",
-        "refresh_token": TWITCH_REFRESH_TOKEN,
-        "client_id": TWITCH_CLIENT_ID,
-        "client_secret": TWITCH_CLIENT_SECRET,
-    }
-
-    response = requests.post(url, params=params).json()
-    TWITCH_OAUTH_TOKEN = response.get("access_token")
-    TWITCH_REFRESH_TOKEN = response.get("refresh_token")
-    print("✅ Twitch token refreshed successfully!")
 
 # --- All Supported Events ---
 ALL_EVENTS = [
@@ -81,12 +60,10 @@ ALL_EVENTS = [
     Events.MOMENT_CLAIM,
 ]
 
-# --- Refresh token at start ---
-refresh_twitch_token()
-
 # --- Twitch Miner Setup ---
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
+    access_token=TWITCH_OAUTH_TOKEN,
     claim_drops_startup=False,
     priority=[Priority.STREAK, Priority.DROPS, Priority.POINTS_ASCENDING],
     enable_analytics=False,
@@ -146,12 +123,31 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
+# --- Function to update Twitch tokens ---
+def update_twitch_tokens(new_access_token: str, new_refresh_token: str):
+    global TWITCH_OAUTH_TOKEN
+    global TWITCH_REFRESH_TOKEN
+
+    TWITCH_OAUTH_TOKEN = new_access_token
+    TWITCH_REFRESH_TOKEN = new_refresh_token
+
+    os.environ["TWITCH_OAUTH_TOKEN"] = TWITCH_OAUTH_TOKEN
+    os.environ["TWITCH_REFRESH_TOKEN"] = TWITCH_REFRESH_TOKEN
+
+    twitch_miner.update_tokens(new_access_token)  # updates miner's token
+    print("Updated Twitch tokens successfully!")
+
 # --- Start Web Server + Miner ---
 if __name__ == "__main__":
+    # Run web server in background for Railway keep-alive
     threading.Thread(target=run_web).start()
+
+    # Prepare streamers from environment
     streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
+
+    # Start mining
     twitch_miner.mine(
         streamers,
-        followers=True,
+        followers=True,            # automatically fetch followers
         followers_order=FollowersOrder.ASC
     )
