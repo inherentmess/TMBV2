@@ -1,17 +1,23 @@
-FROM python:3.11-slim
-ENV PYTHONUNBUFFERED=1
+# Use official Python image
+FROM python:3.12-slim
 
+# Set working directory
 WORKDIR /usr/src/app
 
-COPY requirements.txt .
+# Copy requirements
+COPY requirements.txt ./
+
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy project files
 COPY . .
 
-# Uncomment if using cookies login persistence
-# VOLUME ["/usr/src/app/cookies"]
+# Expose port for Railway web server
+EXPOSE 3000
 
-# Uncomment if using the analytics server
-# EXPOSE 5000
+# Set environment variables for Railway (optional defaults)
+ENV PORT=3000
 
-CMD ["python", "main.py"]
+# Run main.py
+ENTRYPOINT ["python", "main.py"]
