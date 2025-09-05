@@ -27,7 +27,7 @@ def home():
     return "Twitch Miner is running"
 
 def run_web():
-    app.run(host="0.0.0.0", port=3000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 3000)))
 
 # --- Environment Variables ---
 TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
@@ -37,7 +37,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# --- Refresh followers interval (minutes) ---
+# --- Refresh followers interval (minutes) and chunk size ---
 REFRESH_INTERVAL = int(os.getenv("REFRESH_INTERVAL", "30"))  # default 30 min
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "5"))
 
@@ -128,28 +128,37 @@ twitch_miner = TwitchChannelPointsMiner(
 # --- Mining function for a subset of channels ---
 def mine_subset(subset):
     streamers = [Streamer(name.strip()) for name in subset if name.strip()]
-    twitch_miner.mine(streamers, followers=True, followers_order=FollowersOrder.ASC)
+    # Only mine if the streamer list is not empty
+    if streamers:
+        twitch_miner.mine(streamers, followers=True, followers_order=FollowersOrder.ASC)
 
-# --- Auto-refresh followers ---
+# --- Auto-refresh followers safely ---
 def refresh_followers():
     while True:
         time.sleep(REFRESH_INTERVAL * 60)
         logging.info(f"[AUTO-REFRESH] Reloading followers (every {REFRESH_INTERVAL} min)...")
-        mine_subset(CHANNELS)
+        try:
+            new_followers = twitch_miner.twitch.get_followers(order=FollowersOrder.ASC)
+            for username in new_followers:
+                if username not in [s.username if hasattr(s, 'username') else s for s in twitch_miner.streamers]:
+                    # Only add new followers to the existing session
+                    twitch_miner.streamers.append(Streamer(username))
+        except Exception as e:
+            logging.error(f"[refresh_followers] Error: {e}")
 
 # --- Main ---
 if __name__ == "__main__":
-    # Start web server in a separate thread
+    # Start web server thread
     threading.Thread(target=run_web, daemon=True).start()
 
-    # Split channels into chunks
+    # Split channels into chunks and start mining threads
     threads = []
     for i in range(0, len(CHANNELS), CHUNK_SIZE):
         t = threading.Thread(target=mine_subset, args=(CHANNELS[i:i+CHUNK_SIZE],))
         threads.append(t)
         t.start()
 
-    # Start auto-refresh thread
+    # Start auto-refresh followers thread
     threading.Thread(target=refresh_followers, daemon=True).start()
 
     # Keep main thread alive
