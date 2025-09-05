@@ -26,12 +26,10 @@ def home():
     return "Twitch Miner is running"
 
 def run_web():
-    app.run(host="0.0.0.0", port=3000)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 3000)))
 
 # --- Environment Variables ---
 TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
-TWITCH_OAUTH_TOKEN = os.getenv("TWITCH_OAUTH_TOKEN")
-TWITCH_REFRESH_TOKEN = os.getenv("TWITCH_REFRESH_TOKEN")
 CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -60,94 +58,84 @@ ALL_EVENTS = [
     Events.MOMENT_CLAIM,
 ]
 
-# --- Twitch Miner Setup ---
+# --- Logger Settings ---
+logger_settings = LoggerSettings(
+    save=True,
+    console_level=logging.INFO,
+    file_level=logging.DEBUG,
+    emoji=True,
+    less=False,
+    colored=True,
+    color_palette=ColorPalette(
+        STREAMER_online="GREEN",
+        streamer_offline="RED",
+        BET_wiN=Fore.MAGENTA
+    ),
+    telegram=Telegram(
+        chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
+        token=TELEGRAM_TOKEN,
+        events=ALL_EVENTS,
+        disable_notification=True
+    ) if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID else None,
+    discord=Discord(
+        webhook_api=DISCORD_WEBHOOK_URL,
+        events=ALL_EVENTS
+    ) if DISCORD_WEBHOOK_URL else None,
+    webhook=Webhook(
+        endpoint=WEBHOOK_URL,
+        method="POST",
+        events=ALL_EVENTS
+    ) if WEBHOOK_URL else None
+)
+
+# --- Streamer Settings ---
+streamer_settings = StreamerSettings(
+    make_predictions=False,
+    follow_raid=True,
+    claim_drops=True,
+    claim_moments=True,
+    watch_streak=True,
+    community_goals=True,
+    chat=ChatPresence.ONLINE,
+    bet=BetSettings(
+        strategy=Strategy.SMART,
+        percentage=5,
+        percentage_gap=20,
+        max_points=50000,
+        stealth_mode=True,
+        delay_mode=DelayMode.FROM_END,
+        delay=6,
+        minimum_points=20000,
+        filter_condition=FilterCondition(
+            by=OutcomeKeys.TOTAL_USERS,
+            where=Condition.LTE,
+            value=800
+        )
+    )
+)
+
+# --- Initialize Miner ---
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
-    access_token=TWITCH_OAUTH_TOKEN,
     claim_drops_startup=False,
     priority=[Priority.STREAK, Priority.DROPS, Priority.POINTS_ASCENDING],
     enable_analytics=False,
     disable_ssl_cert_verification=False,
     disable_at_in_nickname=False,
-    logger_settings=LoggerSettings(
-        save=True,
-        console_level=logging.INFO,
-        file_level=logging.DEBUG,
-        emoji=True,
-        less=False,
-        colored=True,
-        color_palette=ColorPalette(
-            STREAMER_online="GREEN",
-            streamer_offline="RED",
-            BET_wiN=Fore.MAGENTA
-        ),
-        telegram=Telegram(
-            chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
-            token=TELEGRAM_TOKEN,
-            events=ALL_EVENTS,
-            disable_notification=True
-        ) if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID else None,
-        discord=Discord(
-            webhook_api=DISCORD_WEBHOOK_URL,
-            events=ALL_EVENTS
-        ) if DISCORD_WEBHOOK_URL else None,
-        webhook=Webhook(
-            endpoint=WEBHOOK_URL,
-            method="POST",
-            events=ALL_EVENTS
-        ) if WEBHOOK_URL else None
-    ),
-    streamer_settings=StreamerSettings(
-        make_predictions=False,
-        follow_raid=True,
-        claim_drops=True,
-        claim_moments=True,
-        watch_streak=True,
-        community_goals=True,
-        chat=ChatPresence.ONLINE,
-        bet=BetSettings(
-            strategy=Strategy.SMART,
-            percentage=5,
-            percentage_gap=20,
-            max_points=50000,
-            stealth_mode=True,
-            delay_mode=DelayMode.FROM_END,
-            delay=6,
-            minimum_points=20000,
-            filter_condition=FilterCondition(
-                by=OutcomeKeys.TOTAL_USERS,
-                where=Condition.LTE,
-                value=800
-            )
-        )
-    )
+    logger_settings=logger_settings,
+    streamer_settings=streamer_settings
 )
-
-# --- Function to update Twitch tokens ---
-def update_twitch_tokens(new_access_token: str, new_refresh_token: str):
-    global TWITCH_OAUTH_TOKEN
-    global TWITCH_REFRESH_TOKEN
-
-    TWITCH_OAUTH_TOKEN = new_access_token
-    TWITCH_REFRESH_TOKEN = new_refresh_token
-
-    os.environ["TWITCH_OAUTH_TOKEN"] = TWITCH_OAUTH_TOKEN
-    os.environ["TWITCH_REFRESH_TOKEN"] = TWITCH_REFRESH_TOKEN
-
-    twitch_miner.update_tokens(new_access_token)  # updates miner's token
-    print("Updated Twitch tokens successfully!")
 
 # --- Start Web Server + Miner ---
 if __name__ == "__main__":
-    # Run web server in background for Railway keep-alive
     threading.Thread(target=run_web).start()
 
-    # Prepare streamers from environment
+    # Convert CHANNELS into Streamer objects
     streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
 
-    # Start mining
+    # Start mining and fetch followers automatically
     twitch_miner.mine(
         streamers,
-        followers=True,            # automatically fetch followers
+        followers=True,
         followers_order=FollowersOrder.ASC
     )
