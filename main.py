@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
-import logging
 import threading
-import time
+import logging
 import requests
 from flask import Flask
-from colorama import Fore
-
 from TwitchChannelPointsMiner import TwitchChannelPointsMiner
 from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
 from TwitchChannelPointsMiner.classes.Chat import ChatPresence
@@ -20,7 +17,7 @@ from TwitchChannelPointsMiner.classes.entities.Bet import (
 )
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
 
-# --- Background Web Server (for Railway keep-alive) ---
+# --- Web server for Railway keep-alive ---
 app = Flask(__name__)
 
 @app.route("/")
@@ -30,13 +27,34 @@ def home():
 def run_web():
     app.run(host="0.0.0.0", port=3000)
 
-# --- Environment Variables ---
+# --- Environment variables ---
 TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
+TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
+TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
+TWITCH_REFRESH_TOKEN = os.getenv("TWITCH_REFRESH_TOKEN")
+
 CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+# --- Function to refresh Twitch OAuth token ---
+def refresh_twitch_token():
+    url = "https://id.twitch.tv/oauth2/token"
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": TWITCH_REFRESH_TOKEN,
+        "client_id": TWITCH_CLIENT_ID,
+        "client_secret": TWITCH_CLIENT_SECRET
+    }
+    response = requests.post(url, data=data)
+    response.raise_for_status()
+    token_data = response.json()
+    return token_data["access_token"], token_data.get("refresh_token", TWITCH_REFRESH_TOKEN)
+
+# --- Refresh token and set access token ---
+ACCESS_TOKEN, TWITCH_REFRESH_TOKEN = refresh_twitch_token()
 
 # --- All Supported Events ---
 ALL_EVENTS = [
@@ -60,46 +78,9 @@ ALL_EVENTS = [
     Events.MOMENT_CLAIM,
 ]
 
-# --- Twitch OAuth Refresh Function ---
-def refresh_twitch_token():
-    client_id = os.getenv("TWITCH_CLIENT_ID")
-    client_secret = os.getenv("TWITCH_CLIENT_SECRET")
-    refresh_token = os.getenv("TWITCH_REFRESH_TOKEN")
-
-    url = "https://id.twitch.tv/oauth2/token"
-    params = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": client_id,
-        "client_secret": client_secret
-    }
-
-    response = requests.post(url, params=params)
-    response.raise_for_status()
-    data = response.json()
-
-    os.environ["TWITCH_OAUTH_TOKEN"] = data["access_token"]
-    os.environ["TWITCH_REFRESH_TOKEN"] = data["refresh_token"]
-    print("Twitch OAuth token refreshed successfully.")
-
-# Refresh token at startup
-refresh_twitch_token()
-
-# Optional: periodic refresh in background
-def periodic_refresh(interval=3000):
-    while True:
-        try:
-            refresh_twitch_token()
-        except Exception as e:
-            print(f"Failed to refresh token: {e}")
-        time.sleep(interval)
-
-threading.Thread(target=periodic_refresh, daemon=True).start()
-
-# --- Twitch Miner Setup ---
+# --- Initialize TwitchChannelPointsMiner ---
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
-    access_token=os.getenv("TWITCH_OAUTH_TOKEN"),
     claim_drops_startup=False,
     priority=[Priority.STREAK, Priority.DROPS, Priority.POINTS_ASCENDING],
     enable_analytics=False,
@@ -114,8 +95,7 @@ twitch_miner = TwitchChannelPointsMiner(
         colored=True,
         color_palette=ColorPalette(
             STREAMER_online="GREEN",
-            streamer_offline="RED",
-            BET_wiN=Fore.MAGENTA
+            streamer_offline="RED"
         ),
         telegram=Telegram(
             chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
@@ -159,7 +139,7 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Start Web Server + Miner ---
+# --- Start Web server + Miner ---
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
 
