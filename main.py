@@ -2,7 +2,8 @@
 import os
 import logging
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+import requests
 from flask import Flask
 from colorama import Fore
 
@@ -36,6 +37,34 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
+TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
+TWITCH_REFRESH_TOKEN = os.getenv("TWITCH_REFRESH_TOKEN")
+
+# --- Token Refresh Function ---
+def refresh_token():
+    url = "https://id.twitch.tv/oauth2/token"
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": TWITCH_REFRESH_TOKEN,
+        "client_id": TWITCH_CLIENT_ID,
+        "client_secret": TWITCH_CLIENT_SECRET
+    }
+    response = requests.post(url, data=data)
+    if response.status_code == 200:
+        tokens = response.json()
+        os.environ["TWITCH_ACCESS_TOKEN"] = tokens["access_token"]
+        global TWITCH_REFRESH_TOKEN
+        TWITCH_REFRESH_TOKEN = tokens["refresh_token"]
+        print("Twitch token refreshed successfully!")
+    else:
+        print("Failed to refresh token:", response.text)
+
+# --- Periodic Refresh ---
+def schedule_refresh(interval_hours=3):
+    refresh_token()
+    threading.Timer(interval_hours * 3600, schedule_refresh).start()
 
 # --- All Supported Events ---
 ALL_EVENTS = [
@@ -96,7 +125,7 @@ twitch_miner = TwitchChannelPointsMiner(
         ) if WEBHOOK_URL else None
     ),
     streamer_settings=StreamerSettings(
-        make_predictions=True,
+        make_predictions=False,
         follow_raid=True,
         claim_drops=True,
         claim_moments=True,
@@ -121,31 +150,14 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Parallel Follower Fetching ---
-def fetch_streamer_followers(streamer_name):
-    try:
-        followers = twitch_miner.twitch.get_followers(streamer_name)  # adjust if using a different API method
-        print(f"Streamer {streamer_name}: {len(followers)} followers")
-        return (streamer_name, followers)
-    except Exception as e:
-        print(f"Failed to fetch followers for {streamer_name}: {e}")
-        return (streamer_name, [])
-
+# --- Start Web Server + Miner + Token Refresh ---
 if __name__ == "__main__":
-    # Start web server for Railway keep-alive
     threading.Thread(target=run_web).start()
+    schedule_refresh()  # start auto-refreshing every 3 hours
 
-    # Mine Twitch channel points
     streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
     twitch_miner.mine(
         streamers,
         followers=True,
         followers_order=FollowersOrder.ASC
     )
-
-    # --- Fetch followers in parallel ---
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_streamer_followers, s.name): s.name for s in streamers}
-        for future in as_completed(futures):
-            streamer_name, followers = future.result()
-            # Here you can process followers further if needed
