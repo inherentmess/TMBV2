@@ -2,6 +2,7 @@
 import os
 import logging
 import threading
+import time
 from flask import Flask
 from colorama import Fore
 
@@ -35,6 +36,10 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+# --- Refresh followers interval (minutes) ---
+REFRESH_INTERVAL = int(os.getenv("REFRESH_INTERVAL", "30"))  # default 30 min
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "5"))
 
 # --- All Supported Events ---
 ALL_EVENTS = [
@@ -125,19 +130,28 @@ def mine_subset(subset):
     streamers = [Streamer(name.strip()) for name in subset if name.strip()]
     twitch_miner.mine(streamers, followers=True, followers_order=FollowersOrder.ASC)
 
+# --- Auto-refresh followers ---
+def refresh_followers():
+    while True:
+        time.sleep(REFRESH_INTERVAL * 60)
+        logging.info(f"[AUTO-REFRESH] Reloading followers (every {REFRESH_INTERVAL} min)...")
+        mine_subset(CHANNELS)
+
 # --- Main ---
 if __name__ == "__main__":
     # Start web server in a separate thread
-    threading.Thread(target=run_web).start()
+    threading.Thread(target=run_web, daemon=True).start()
 
-    # Split channels into chunks (change chunk_size to control parallelization)
-    chunk_size = 5
+    # Split channels into chunks
     threads = []
-    for i in range(0, len(CHANNELS), chunk_size):
-        t = threading.Thread(target=mine_subset, args=(CHANNELS[i:i+chunk_size],))
+    for i in range(0, len(CHANNELS), CHUNK_SIZE):
+        t = threading.Thread(target=mine_subset, args=(CHANNELS[i:i+CHUNK_SIZE],))
         threads.append(t)
         t.start()
 
-    # Wait for all threads to finish
+    # Start auto-refresh thread
+    threading.Thread(target=refresh_followers, daemon=True).start()
+
+    # Keep main thread alive
     for t in threads:
         t.join()
