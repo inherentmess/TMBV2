@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
-import threading
 import logging
+import threading
 from flask import Flask
 from colorama import Fore
 
@@ -66,7 +66,6 @@ twitch_miner = TwitchChannelPointsMiner(
     enable_analytics=False,
     disable_ssl_cert_verification=False,
     disable_at_in_nickname=False,
-    max_threads=10,  # increase parallelization (max concurrent channels)
     logger_settings=LoggerSettings(
         save=True,
         console_level=logging.INFO,
@@ -121,17 +120,24 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Start Web Server + Miner ---
+# --- Mining function for a subset of channels ---
+def mine_subset(subset):
+    streamers = [Streamer(name.strip()) for name in subset if name.strip()]
+    twitch_miner.mine(streamers, followers=True, followers_order=FollowersOrder.ASC)
+
+# --- Main ---
 if __name__ == "__main__":
-    # Start Railway web server
+    # Start web server in a separate thread
     threading.Thread(target=run_web).start()
 
-    # Combine manually added channels with followed channels
-    streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
+    # Split channels into chunks (change chunk_size to control parallelization)
+    chunk_size = 5
+    threads = []
+    for i in range(0, len(CHANNELS), chunk_size):
+        t = threading.Thread(target=mine_subset, args=(CHANNELS[i:i+chunk_size],))
+        threads.append(t)
+        t.start()
 
-    # Start mining with follower discovery
-    twitch_miner.mine(
-        streamers,
-        followers=True,                # mine channels you follow
-        followers_order=FollowersOrder.ASC
-    )
+    # Wait for all threads to finish
+    for t in threads:
+        t.join()
