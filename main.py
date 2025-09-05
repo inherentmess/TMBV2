@@ -2,6 +2,7 @@
 import os
 import logging
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask
 from colorama import Fore
 
@@ -95,7 +96,7 @@ twitch_miner = TwitchChannelPointsMiner(
         ) if WEBHOOK_URL else None
     ),
     streamer_settings=StreamerSettings(
-        make_predictions=False,
+        make_predictions=True,
         follow_raid=True,
         claim_drops=True,
         claim_moments=True,
@@ -120,13 +121,31 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Start Web Server + Miner ---
+# --- Parallel Follower Fetching ---
+def fetch_streamer_followers(streamer_name):
+    try:
+        followers = twitch_miner.twitch.get_followers(streamer_name)  # adjust if using a different API method
+        print(f"Streamer {streamer_name}: {len(followers)} followers")
+        return (streamer_name, followers)
+    except Exception as e:
+        print(f"Failed to fetch followers for {streamer_name}: {e}")
+        return (streamer_name, [])
+
 if __name__ == "__main__":
+    # Start web server for Railway keep-alive
     threading.Thread(target=run_web).start()
 
+    # Mine Twitch channel points
     streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
     twitch_miner.mine(
         streamers,
         followers=True,
         followers_order=FollowersOrder.ASC
     )
+
+    # --- Fetch followers in parallel ---
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_streamer_followers, s.name): s.name for s in streamers}
+        for future in as_completed(futures):
+            streamer_name, followers = future.result()
+            # Here you can process followers further if needed
