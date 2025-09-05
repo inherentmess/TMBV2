@@ -3,6 +3,7 @@ import os
 import threading
 import logging
 import requests
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask
 from TwitchChannelPointsMiner import TwitchChannelPointsMiner
 from TwitchChannelPointsMiner.logger import LoggerSettings, ColorPalette
@@ -17,7 +18,7 @@ from TwitchChannelPointsMiner.classes.entities.Bet import (
 )
 from TwitchChannelPointsMiner.classes.entities.Streamer import Streamer, StreamerSettings
 
-# --- Web server for Railway keep-alive ---
+# --- Flask server for Railway keep-alive ---
 app = Flask(__name__)
 
 @app.route("/")
@@ -39,7 +40,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# --- Function to refresh Twitch OAuth token ---
+# --- Refresh Twitch OAuth token ---
 def refresh_twitch_token():
     url = "https://id.twitch.tv/oauth2/token"
     data = {
@@ -53,7 +54,6 @@ def refresh_twitch_token():
     token_data = response.json()
     return token_data["access_token"], token_data.get("refresh_token", TWITCH_REFRESH_TOKEN)
 
-# --- Refresh token and set access token ---
 ACCESS_TOKEN, TWITCH_REFRESH_TOKEN = refresh_twitch_token()
 
 # --- All Supported Events ---
@@ -78,7 +78,7 @@ ALL_EVENTS = [
     Events.MOMENT_CLAIM,
 ]
 
-# --- Initialize TwitchChannelPointsMiner ---
+# --- Initialize Twitch Miner ---
 twitch_miner = TwitchChannelPointsMiner(
     username=TWITCH_USERNAME,
     claim_drops_startup=False,
@@ -139,13 +139,18 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Start Web server + Miner ---
-if __name__ == "__main__":
-    threading.Thread(target=run_web).start()
-
-    streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
+# --- Function to mine a single streamer ---
+def mine_streamer(streamer_name):
+    streamer = Streamer(streamer_name.strip())
     twitch_miner.mine(
-        streamers,
+        [streamer],
         followers=True,
         followers_order=FollowersOrder.ASC
     )
+
+# --- Start Web server + Parallel mining ---
+if __name__ == "__main__":
+    threading.Thread(target=run_web).start()
+
+    with ThreadPoolExecutor(max_workers=len(CHANNELS)) as executor:
+        executor.map(mine_streamer, [name for name in CHANNELS if name.strip()])
