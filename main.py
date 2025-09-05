@@ -2,7 +2,6 @@
 import os
 import logging
 import threading
-import time
 import requests
 from flask import Flask
 from colorama import Fore
@@ -31,6 +30,10 @@ def run_web():
     app.run(host="0.0.0.0", port=3000)
 
 # --- Environment Variables ---
+TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
+TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
+TWITCH_OAUTH_TOKEN = os.getenv("TWITCH_OAUTH_TOKEN")
+TWITCH_REFRESH_TOKEN = os.getenv("TWITCH_REFRESH_TOKEN")
 TWITCH_USERNAME = os.getenv("TWITCH_USERNAME")
 CHANNELS = os.getenv("CHANNELS", "").split(",")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
@@ -38,33 +41,23 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
-TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
-TWITCH_REFRESH_TOKEN = os.getenv("TWITCH_REFRESH_TOKEN")
+# --- Refresh Twitch Token Function ---
+def refresh_twitch_token():
+    global TWITCH_OAUTH_TOKEN
+    global TWITCH_REFRESH_TOKEN
 
-# --- Token Refresh Function ---
-def refresh_token():
     url = "https://id.twitch.tv/oauth2/token"
-    data = {
+    params = {
         "grant_type": "refresh_token",
         "refresh_token": TWITCH_REFRESH_TOKEN,
         "client_id": TWITCH_CLIENT_ID,
-        "client_secret": TWITCH_CLIENT_SECRET
+        "client_secret": TWITCH_CLIENT_SECRET,
     }
-    response = requests.post(url, data=data)
-    if response.status_code == 200:
-        tokens = response.json()
-        os.environ["TWITCH_ACCESS_TOKEN"] = tokens["access_token"]
-        global TWITCH_REFRESH_TOKEN
-        TWITCH_REFRESH_TOKEN = tokens["refresh_token"]
-        print("Twitch token refreshed successfully!")
-    else:
-        print("Failed to refresh token:", response.text)
 
-# --- Periodic Refresh ---
-def schedule_refresh(interval_hours=3):
-    refresh_token()
-    threading.Timer(interval_hours * 3600, schedule_refresh).start()
+    response = requests.post(url, params=params).json()
+    TWITCH_OAUTH_TOKEN = response.get("access_token")
+    TWITCH_REFRESH_TOKEN = response.get("refresh_token")
+    print("✅ Twitch token refreshed successfully!")
 
 # --- All Supported Events ---
 ALL_EVENTS = [
@@ -87,6 +80,9 @@ ALL_EVENTS = [
     Events.CHAT_MENTION,
     Events.MOMENT_CLAIM,
 ]
+
+# --- Refresh token at start ---
+refresh_twitch_token()
 
 # --- Twitch Miner Setup ---
 twitch_miner = TwitchChannelPointsMiner(
@@ -150,11 +146,9 @@ twitch_miner = TwitchChannelPointsMiner(
     )
 )
 
-# --- Start Web Server + Miner + Token Refresh ---
+# --- Start Web Server + Miner ---
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
-    schedule_refresh()  # start auto-refreshing every 3 hours
-
     streamers = [Streamer(name.strip()) for name in CHANNELS if name.strip()]
     twitch_miner.mine(
         streamers,
